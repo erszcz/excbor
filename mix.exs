@@ -4,8 +4,8 @@ defmodule Excbor.Mixfile do
   def project do
     [ app: :excbor,
       version: "0.0.1",
-      elixir: "~> 0.12.3-dev",
-      deps: deps ]
+      elixir: "~> 1.4.0",
+      deps: deps() ]
   end
 
   def application do
