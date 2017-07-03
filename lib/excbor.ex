@@ -197,7 +197,7 @@ defmodule CBOR do
         <<131, 110, _, 0, s::binary>> -> s
         <<131, 111, _, _, _, _, 0, s::binary>> -> s
       end
-      s = iolist_to_binary(:lists.reverse(lc <<b>> inbits s do b end))
+      s = iolist_to_binary(:lists.reverse(for <<b::size(8) <- s>>, do: b))
       CBOR.encode_string(2, s, CBOR.encode_head(6, tag, acc))
     end
   end
