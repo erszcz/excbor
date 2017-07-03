@@ -1,52 +1,61 @@
-defrecord CBOR.Tag, tag: nil, value: nil
-defrecord CBOR.Decoder.Treatment.Map,
-                            newmap: &CBOR.default_newmap/0,
-                            add_to_map: &CBOR.default_add_to_map/3,
-                            finish_map: &CBOR.default_finish_map/1,
-                            empty_map: &CBOR.default_empty_map/0
-defrecord CBOR.Decoder.Treatment,
-                  text: &CBOR.identity/1,
-                  bytes: &CBOR.mark_as_bytes/1,
-                  nonfinites: &CBOR.decode_non_finite/2,
-                  map: CBOR.Decoder.Treatment.Map.new,
-                  tags: []
+defmodule CBOR.Tag do
+  defstruct [tag: nil, value: nil]
+  def new(tag, value), do: %__MODULE__{tag: tag, value: value}
+end
+
+defmodule CBOR.Decoder.Treatment.Map do
+  defstruct [ newmap: &CBOR.default_newmap/0,
+              add_to_map: &CBOR.default_add_to_map/3,
+              finish_map: &CBOR.default_finish_map/1,
+              empty_map: &CBOR.default_empty_map/0 ]
+end
+
+defmodule CBOR.Decoder.Treatment do
+  defstruct [ text: &CBOR.identity/1,
+              bytes: &CBOR.mark_as_bytes/1,
+              nonfinites: &CBOR.decode_non_finite/2,
+              map: %CBOR.Decoder.Treatment.Map{},
+              tags: [] ]
+end
+
 defmodule CBOR do
-  def decode_non_finite(0, 0), do: {CBOR.Tag, :float, :inf}
-  def decode_non_finite(1, 0), do: {CBOR.Tag, :float, :"-inf"}
-  def decode_non_finite(_, _), do: {CBOR.Tag, :float, :nan}
+  def decode_non_finite(0, 0), do: CBOR.Tag.new(:float, :inf)
+  def decode_non_finite(1, 0), do: CBOR.Tag.new(:float, :"-inf")
+  def decode_non_finite(_, _), do: CBOR.Tag.new(:float, :nan)
   def default_newmap(), do: []
-  def default_add_to_map(map, k, v), do: [{k,v}|map]
+  def default_add_to_map(map, k, v), do: [{k,v} | map]
   def default_finish_map(map), do: Enum.reverse(map)
   def default_empty_map(), do: [{}]
   def hash_add_to_map(map, k, v), do: HashDict.put(map, k, v)
-  def hash_empty_map(), do: HashDict.new
+  def hash_empty_map(), do: HashDict.new()
   def identity(x), do: x
-  def mark_as_bytes({x,rest}), do: {{CBOR.Tag, :bytes, x}, rest}
-  @default_treatment CBOR.Decoder.Treatment.new
-  @hash_treatment_map CBOR.Decoder.Treatment.Map[
-                              newmap: &CBOR.hash_empty_map/0,
-                              add_to_map: &CBOR.hash_add_to_map/3,
-                              finish_map: &CBOR.identity/1,
-                              empty_map: &CBOR.hash_empty_map/0]
-  @hash_treatment CBOR.Decoder.Treatment[map: @hash_treatment_map]
+  def mark_as_bytes({x,rest}), do: {CBOR.Tag.new(:bytes, x), rest}
+  @default_treatment %CBOR.Decoder.Treatment{}
+  @hash_treatment_map %CBOR.Decoder.Treatment.Map{
+    newmap: &CBOR.hash_empty_map/0,
+    add_to_map: &CBOR.hash_add_to_map/3,
+    finish_map: &CBOR.identity/1,
+    empty_map: &CBOR.hash_empty_map/0
+  }
+  @hash_treatment %CBOR.Decoder.Treatment{map: @hash_treatment_map}
   def decode_header(<< mt::size(3), val::size(5),
                     rest::binary >>) when val < 24, do: {mt, val, rest}
   def decode_header(<< mt::size(3), 24::size(5),
-                    val::[unsigned, size(8)], rest::binary >>), do: {mt, val, rest}
+                    val::unsigned-size(8), rest::binary >>), do: {mt, val, rest}
   def decode_header(<< mt::size(3), 25::size(5),
-                    val::[unsigned, size(16)], rest::binary >>), do: {mt, val, rest}
+                    val::unsigned-size(16), rest::binary >>), do: {mt, val, rest}
   def decode_header(<< mt::size(3), 26::size(5),
-                    val::[unsigned, size(32)], rest::binary >>), do: {mt, val, rest}
+                    val::unsigned-size(32), rest::binary >>), do: {mt, val, rest}
   def decode_header(<< mt::size(3), 27::size(5),
-                    val::[unsigned, size(64)], rest::binary >>), do: {mt, val, rest}
+                    val::unsigned-size(64), rest::binary >>), do: {mt, val, rest}
   def decode_header(<< mt::size(3), 31::size(5), rest::binary >>), do: {mt, :indefinite, rest}
   def decode_with_hashes(bin), do: decode(bin, @hash_treatment)
-  def decode(bin, treatment // @default_treatment) do
+  def decode(bin, treatment \\ @default_treatment) do
     {term, ""} = decode_with_rest(bin, treatment)
     term
   end
   def decode_with_hashes_with_rest(bin), do: decode_with_rest(bin, @hash_treatment)
-  def decode_with_rest(bin, treatment // @default_treatment) do
+  def decode_with_rest(bin, treatment \\ @default_treatment) do
     {mt, val, rest} = decode_header(bin)
     case val do
       :indefinite ->
@@ -70,17 +79,17 @@ defmodule CBOR do
           7 -> case bin do
                  << 0xf9, sign::size(1), exp::size(5), mant::size(10),
                     _::binary >> -> {decode_half(sign, exp, mant, treatment), rest}
-                 << 0xfa, value::[float, size(32)], _::binary >> -> {value, rest}
+                 << 0xfa, value::float-size(32), _::binary >> -> {value, rest}
                  << 0xfa, sign::size(1), 255::size(8), mant::size(23),
                     _::binary >> -> {treatment.nonfinites.(sign, mant), rest}
-                 << 0xfb, value::[float, size(64)], _::binary >> -> {value, rest}
+                 << 0xfb, value::float-size(64), _::binary >> -> {value, rest}
                  << 0xfb, sign::size(1), 2047::size(11), mant::size(52),
                     _::binary >> -> {treatment.nonfinites.(sign, mant), rest}
                  _ -> case val do
                         20 -> {false, rest}
                         21 -> {true, rest}
                         22 -> {nil, rest}
-                        _ -> {{CBOR.Tag, :simple, val}, rest}
+                        _ -> {CBOR.Tag.new(:simple, val), rest}
                       end
                end
         end
@@ -88,7 +97,7 @@ defmodule CBOR do
   end
   defp decode_half(sign, 31, mant, treatment), do: treatment.nonfinites.(sign, mant)
   defp decode_half(sign, exp, mant, _) do
-    << value::[float, size(32)] >> =
+    << value::float-size(32) >> =
       << sign::size(1), exp::size(8), mant::size(10), 0::size(13) >>
     value * 5192296858534827628530496329220096.0 # 2**112 -- difference in bias
   end
@@ -96,28 +105,28 @@ defmodule CBOR do
   defp decode_tag(2, value, _treatment) do
     # is it a byte string?
     bytes = case value do
-      {CBOR.Tag, :bytes, bytes} when is_binary(bytes) -> bytes
+      %CBOR.Tag{tag: :bytes, value: bytes} when is_binary(bytes) -> bytes
       bytes when is_binary(bytes) -> bytes #  when deftag == :bytes XXX
     end
     sz = byte_size(bytes)
-    <<res::[integer,unsigned,size(sz),unit(8)]>> = bytes
+    <<res::integer-unsigned-size(sz)-unit(8)>> = bytes
     res
   end
   defp decode_tag(tag, value, treatment) do
     case treatment.tags[tag] do
-      nil -> {CBOR.Tag, tag, value}
+      nil -> CBOR.Tag.new(tag, value)
       fun -> fun.(tag, value, treatment)
     end
   end
   defp decode_string(rest, len) do
-    << value::[binary, size(len)], new_rest::binary >> = rest
+    << value::binary-size(len), new_rest::binary >> = rest
     {value, new_rest}
   end
   defp decode_string_indefinite(rest, actmt, acc) do
     case decode_header(rest) do
       {7, :indefinite, new_rest} -> {Enum.join(Enum.reverse(acc)), new_rest}
       {^actmt, len, mid_rest} ->
-        << value::[binary, size(len)], new_rest::binary >> = mid_rest
+        << value::binary-size(len), new_rest::binary >> = mid_rest
         decode_string_indefinite(new_rest, actmt, [value|acc])
     end
   end
@@ -169,16 +178,16 @@ defmodule CBOR do
   # --------------------
   def encode_head(mt, val, acc) when val < 24, do: << acc::binary, mt::size(3), val::size(5) >>
   def encode_head(mt, val, acc) when val < 0x100 do
-    << acc::binary, mt::size(3), 24::size(5), val::[unsigned, size(8)] >>
+    << acc::binary, mt::size(3), 24::size(5), val::unsigned-size(8) >>
   end
   def encode_head(mt, val, acc) when val < 0x10000 do
-    << acc::binary, mt::size(3), 25::size(5), val::[unsigned, size(16)] >>
+    << acc::binary, mt::size(3), 25::size(5), val::unsigned-size(16) >>
   end
   def encode_head(mt, val, acc) when val < 0x100000000 do
-    << acc::binary, mt::size(3), 26::size(5), val::[unsigned, size(32)] >>
+    << acc::binary, mt::size(3), 26::size(5), val::unsigned-size(32) >>
   end
   def encode_head(mt, val, acc) when val < 0x10000000000000000 do
-    << acc::binary, mt::size(3), 27::size(5), val::[unsigned, size(64)] >>
+    << acc::binary, mt::size(3), 27::size(5), val::unsigned-size(64) >>
   end
   def encode_head_indefinite(mt, acc), do: << acc::binary, mt::size(3), 31::size(5) >>
   def encode_string(mt, s, acc), do: << CBOR.encode_head(mt, byte_size(s), acc) :: binary, s :: binary >>
@@ -197,16 +206,16 @@ defmodule CBOR do
         <<131, 110, _, 0, s::binary>> -> s
         <<131, 111, _, _, _, _, 0, s::binary>> -> s
       end
-      s = iolist_to_binary(:lists.reverse(for <<b::size(8) <- s>>, do: b))
+      s = :erlang.iolist_to_binary(:lists.reverse(for <<b::size(8) <- s>>, do: b))
       CBOR.encode_string(2, s, CBOR.encode_head(6, tag, acc))
     end
   end
   defimpl Encoder, for: Float do
     # def encode(x), do: << 0xfb, x::[float, size(64)] >>  # that would be fast
     def encode_into(x, acc) do
-      try1 = << x::[float, size(32)] >> # beware: this may be an infinite
+      try1 = << x::float-size(32) >> # beware: this may be an infinite
       case try1 do
-        << ^x::[float, size(32)] >> -> # infinites are caught here
+        << ^x::float-size(32) >> -> # infinites are caught here
           case try1 do
             << sign::size(1), 0::size(31) >> -> # +0.0, -0.0
               << acc::binary, 0xf9, sign::size(1), 0::size(15) >>
@@ -215,7 +224,7 @@ defmodule CBOR do
               << acc::binary, 0xf9, sign::size(1), (exp-112)::size(5), mant1::size(10) >>
             _ -> << acc::binary, 0xfa, try1::binary >>
           end
-        _ -> << acc::binary, 0xfb, x::[float, size(64)] >>
+        _ -> << acc::binary, 0xfb, x::float-size(64) >>
       end
     end
   end
@@ -228,12 +237,12 @@ defmodule CBOR do
     def encode_into(s, acc), do: CBOR.encode_string(3, s, acc)
   end
   defimpl Encoder, for: CBOR.Tag do
-    def encode_into({CBOR.Tag, :bytes, s}, acc), do: CBOR.encode_string(2, s, acc)
-    def encode_into({CBOR.Tag, :float, :inf}, acc), do: << acc::binary, 0xf9, 0x7c, 0 >>
-    def encode_into({CBOR.Tag, :float, :"-inf"}, acc), do: << acc::binary, 0xf9, 0xfc, 0 >>
-    def encode_into({CBOR.Tag, :float, :nan}, acc), do: << acc::binary, 0xf9, 0x7e, 0 >>
-    def encode_into({CBOR.Tag, :simple, val}, acc) when val < 0x100, do: CBOR.encode_head(7, val, acc)
-    def encode_into({CBOR.Tag, tag, val}, acc), do: CBOR.Encoder.encode_into(val, CBOR.encode_head(6, tag, acc))
+    def encode_into(%CBOR.Tag{tag: :bytes, value: s}, acc), do: CBOR.encode_string(2, s, acc)
+    def encode_into(%CBOR.Tag{tag: :float, value: :inf}, acc), do: << acc::binary, 0xf9, 0x7c, 0 >>
+    def encode_into(%CBOR.Tag{tag: :float, value: :"-inf"}, acc), do: << acc::binary, 0xf9, 0xfc, 0 >>
+    def encode_into(%CBOR.Tag{tag: :float, value: :nan}, acc), do: << acc::binary, 0xf9, 0x7e, 0 >>
+    def encode_into(%CBOR.Tag{tag: :simple, value: val}, acc) when val < 0x100, do: CBOR.encode_head(7, val, acc)
+    def encode_into(%CBOR.Tag{tag: tag, value: val}, acc), do: CBOR.Encoder.encode_into(val, CBOR.encode_head(6, tag, acc))
   end
   defimpl Encoder, for: HashDict do
     def encode_into(dict, acc) do
