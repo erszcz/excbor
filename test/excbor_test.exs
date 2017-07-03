@@ -16,9 +16,9 @@ defmodule(CBORTest) do
   end
   test("tag treatment") do
     tag1treat = fn _, v, _ -> {:time, v} end
-    treatment = CBOR.Decoder.Treatment[tags: [{1, tag1treat}]]
-    assert(CBOR.decode(CBOR.encode({CBOR.Tag, 1, 1390794964}), treatment) == {:time, 1390794964})
-    unknowntag = {CBOR.Tag, 4711, 1390794964}
+    treatment = %CBOR.Decoder.Treatment{tags: [{1, tag1treat}]}
+    assert(CBOR.decode(CBOR.encode(CBOR.Tag.new(1, 1390794964)), treatment) == {:time, 1390794964})
+    unknowntag = CBOR.Tag.new(4711, 1390794964)
     assert(CBOR.decode(CBOR.encode(unknowntag), treatment) == unknowntag)
   end
   test("RFC 7049 Appendix A Example 1") do
@@ -178,47 +178,47 @@ defmodule(CBORTest) do
   end
   test("RFC 7049 Appendix A Example 32") do
     encoded = <<249, 124, 0>>
-    assert(d(encoded) == {CBOR.Tag, :float, :inf})
+    assert(d(encoded) == CBOR.Tag.new(:float, :inf))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 33") do
     encoded = <<249, 126, 0>>
-    assert(d(encoded) == {CBOR.Tag, :float, :nan})
+    assert(d(encoded) == CBOR.Tag.new(:float, :nan))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 34") do
     encoded = <<249, 252, 0>>
-    assert(d(encoded) == {CBOR.Tag, :float, :"-inf"})
+    assert(d(encoded) == CBOR.Tag.new(:float, :"-inf"))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 35") do
     encoded = <<250, 127, 128, 0, 0>>
-    assert(d(encoded) == {CBOR.Tag, :float, :inf})
+    assert(d(encoded) == CBOR.Tag.new(:float, :inf))
     # (no roundtrip)
   end
   test("RFC 7049 Appendix A Example 36") do
     encoded = <<250, 127, 192, 0, 0>>
-    assert(d(encoded) == {CBOR.Tag, :float, :nan})
+    assert(d(encoded) == CBOR.Tag.new(:float, :nan))
     # (no roundtrip)
   end
   test("RFC 7049 Appendix A Example 37") do
     encoded = <<250, 255, 128, 0, 0>>
-    assert(d(encoded) == {CBOR.Tag, :float, :"-inf"})
+    assert(d(encoded) == CBOR.Tag.new(:float, :"-inf"))
     # (no roundtrip)
   end
   test("RFC 7049 Appendix A Example 38") do
     encoded = <<251, 127, 240, 0, 0, 0, 0, 0, 0>>
-    assert(d(encoded) == {CBOR.Tag, :float, :inf})
+    assert(d(encoded) == CBOR.Tag.new(:float, :inf))
     # (no roundtrip)
   end
   test("RFC 7049 Appendix A Example 39") do
     encoded = <<251, 127, 248, 0, 0, 0, 0, 0, 0>>
-    assert(d(encoded) == {CBOR.Tag, :float, :nan})
+    assert(d(encoded) == CBOR.Tag.new(:float, :nan))
     # (no roundtrip)
   end
   test("RFC 7049 Appendix A Example 40") do
     encoded = <<251, 255, 240, 0, 0, 0, 0, 0, 0>>
-    assert(d(encoded) == {CBOR.Tag, :float, :"-inf"})
+    assert(d(encoded) == CBOR.Tag.new(:float, :"-inf"))
     # (no roundtrip)
   end
   test("RFC 7049 Appendix A Example 41") do
@@ -238,62 +238,62 @@ defmodule(CBORTest) do
   end
   test("RFC 7049 Appendix A Example 44") do
     encoded = <<247>>
-    assert(d(encoded) == {CBOR.Tag, :simple, 23})
+    assert(d(encoded) == CBOR.Tag.new(:simple, 23))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 45") do
     encoded = <<240>>
-    assert(d(encoded) == {CBOR.Tag, :simple, 16})
+    assert(d(encoded) == CBOR.Tag.new(:simple, 16))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 46") do
     encoded = <<248, 24>>
-    assert(d(encoded) == {CBOR.Tag, :simple, 24})
+    assert(d(encoded) == CBOR.Tag.new(:simple, 24))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 47") do
     encoded = <<248, 255>>
-    assert(d(encoded) == {CBOR.Tag, :simple, 255})
+    assert(d(encoded) == CBOR.Tag.new(:simple, 255))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 48") do
     encoded = <<192, 116, 50, 48, 49, 51, 45, 48, 51, 45, 50, 49, 84, 50, 48, 58, 48, 52, 58, 48, 48, 90>>
-    assert(d(encoded) == {CBOR.Tag, 0, "2013-03-21T20:04:00Z"})
+    assert(d(encoded) == CBOR.Tag.new(0, "2013-03-21T20:04:00Z"))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 49") do
     encoded = <<193, 26, 81, 75, 103, 176>>
-    assert(d(encoded) == {CBOR.Tag, 1, 1363896240})
+    assert(d(encoded) == CBOR.Tag.new(1, 1363896240))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 50") do
     encoded = <<193, 251, 65, 212, 82, 217, 236, 32, 0, 0>>
-    assert(d(encoded) == {CBOR.Tag, 1, 1363896240.5})
+    assert(d(encoded) == CBOR.Tag.new(1, 1363896240.5))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 51") do
     encoded = <<215, 68, 1, 2, 3, 4>>
-    assert(d(encoded) == {CBOR.Tag, 23, {CBOR.Tag, :bytes, <<1, 2, 3, 4>>}})
+    assert(d(encoded) == CBOR.Tag.new(23, CBOR.Tag.new(:bytes, <<1, 2, 3, 4>>)))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 52") do
     encoded = <<216, 24, 69, 100, 73, 69, 84, 70>>
-    assert(d(encoded) == {CBOR.Tag, 24, {CBOR.Tag, :bytes, "dIETF"}})
+    assert(d(encoded) == CBOR.Tag.new(24, CBOR.Tag.new(:bytes, "dIETF")))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 53") do
     encoded = <<216, 32, 118, 104, 116, 116, 112, 58, 47, 47, 119, 119, 119, 46, 101, 120, 97, 109, 112, 108, 101, 46, 99, 111, 109>>
-    assert(d(encoded) == {CBOR.Tag, 32, "http://www.example.com"})
+    assert(d(encoded) == CBOR.Tag.new(32, "http://www.example.com"))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 54") do
     encoded = "@"
-    assert(d(encoded) == {CBOR.Tag, :bytes, ""})
+    assert(d(encoded) == CBOR.Tag.new(:bytes, ""))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 55") do
     encoded = <<68, 1, 2, 3, 4>>
-    assert(d(encoded) == {CBOR.Tag, :bytes, <<1, 2, 3, 4>>})
+    assert(d(encoded) == CBOR.Tag.new(:bytes, <<1, 2, 3, 4>>))
     assert(CBOR.encode(d(encoded)) == encoded)
   end
   test("RFC 7049 Appendix A Example 56") do
@@ -378,7 +378,7 @@ defmodule(CBORTest) do
   end
   test("RFC 7049 Appendix A Example 72") do
     encoded = <<95, 66, 1, 2, 67, 3, 4, 5, 255>>
-    assert(d(encoded) == {CBOR.Tag, :bytes, <<1, 2, 3, 4, 5>>})
+    assert(d(encoded) == CBOR.Tag.new(:bytes, <<1, 2, 3, 4, 5>>))
     # (no roundtrip)
   end
   test("RFC 7049 Appendix A Example 73") do
