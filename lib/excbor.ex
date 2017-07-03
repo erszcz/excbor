@@ -251,6 +251,13 @@ defmodule CBOR do
                            CBOR.Encoder.encode_into(v, CBOR.Encoder.encode_into(k, acc)) end)
     end
   end
+  defimpl Encoder, for: Map do
+    def encode_into(map, acc) do
+      Enum.reduce(map, CBOR.encode_head(5, Map.size(map), acc),
+                       fn({k, v}, acc) ->
+                          CBOR.Encoder.encode_into(v, CBOR.Encoder.encode_into(k, acc)) end)
+    end
+  end
   defimpl Encoder, for: List do
     def encode_into([], acc), do: << acc::binary, 0x80 >>
     def encode_into([{}], acc), do: << acc::binary, 0xa0 >> # treat as map
