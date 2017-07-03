@@ -113,9 +113,9 @@ defmodule CBOR do
     res
   end
   defp decode_tag(tag, value, treatment) do
-    case treatment.tags[tag] do
+    case List.keyfind treatment.tags, tag, 0 do
       nil -> CBOR.Tag.new(tag, value)
-      fun -> fun.(tag, value, treatment)
+      {^tag, fun} -> fun.(tag, value, treatment)
     end
   end
   defp decode_string(rest, len) do
